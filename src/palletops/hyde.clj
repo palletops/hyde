@@ -168,7 +168,7 @@
   (create-collections-dirs! root site-config)
   (write-gemfile! root jekyll-config)
   (write-config! root site-config)
-  (copy-resources root (:template site-config))
+  (copy-resources! root site-config)
   (write-document! root {:path "_posts/2012-01-01-my-example.md"
                          :content "this is a *test*!"
                          :front-matter
