@@ -1,0 +1,4 @@
+source 'https://rubygems.org'
+{{#gems}}
+gem '{{gem}}'{{#version}}, '{{{version}}}'{{/version}}
+{{/gems}}
