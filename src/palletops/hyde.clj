@@ -8,6 +8,8 @@
             [com.palletops.api-builder.api :refer [defn-api]]
             [schema.core :as s]))
 
+;;; SCHEMAS
+
 (def Jekyll-Config
   {(s/optional-key :gems)
    [{:gem s/Str
@@ -32,30 +34,17 @@
       (s/optional-key :layout) s/Str}}
     (s/optional-key :name) s/Str
     (s/optional-key :title) s/Str
-    (s/optional-key :description) s/Str}})
+    (s/optional-key :description) s/Str
+    s/Keyword s/Any}})
 
-(def jekyll-config
-  {:gems
-   [{:gem "jekyll" :version "2.0.3"}
-    {:gem "rouge" :version "~> 1.3"}
-    {:gem "coderay"}]})
-
-(def site-config
-  {:template :crate
-   :config
-   {:name "test site"
-    :title "test title"
-    :description "this si a long description"
-    :collections
-    {:api
-     {:output true
-      :layout "post"}}}})
-
-(s/validate Site-Config site-config)
+;;;; CODE
 
 (def clean-target fs/delete-dir)
 
-(defn sub-file [root subs]
+(defn sub-file
+  "Given a root path, it provides the path to a subdirectory defined
+  by the subs vector of directory names"
+  [root subs]
   (path/render-path
    (path/normalize*
     (apply conj (path/parse-path root) subs))))
@@ -87,7 +76,7 @@
 (defn-api create-collections-dirs!
   {:sig [[s/Str Site-Config :- s/Bool]]}
   [root {:keys [config]}]
-  (let [default-dirs ["_posts" "_includes" "_layouts"]
+  (let [default-dirs ["_posts" "_includes" "_layouts" "_data" "_plugins"]
         collections (-> config :collections keys)
         collection-dirs (map #(str "_" (name %)) collections)
         all-dirs (concat default-dirs collection-dirs)
@@ -164,22 +153,3 @@
     (spit target content)
     true))
 
-(defn build-site [root jekyll-config site-config]
-  (create-collections-dirs! root site-config)
-  (write-gemfile! root jekyll-config)
-  (write-config! root site-config)
-  (copy-resources! root site-config)
-  (write-document! root {:path "_posts/2012-01-01-my-example.md"
-                         :content "this is a *test*!"
-                         :front-matter
-                         {:title "This is the document"
-                          :index 1}})
-  (write-collection!
-   "/tmp/site"
-   "api"
-   {:index-key :my-index
-    :docs [{:path "doc-a.md"
-            :front-matter {:title "doc a"}
-            :content "this is doc *a*"}
-           {:path "doc-b.md"
-            :content "this is verbatim *b*"}]}))

@@ -23,7 +23,7 @@ A site is defined by two main data structures:
   - `jekyll-config` contains the gems for the site
   - `site-config` contains the configuration of the site itself.
 
-We provide defaults for both:
+For example:
 
 ```clojure
 (def jekyll-config
