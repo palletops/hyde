@@ -9,7 +9,7 @@
 ### Dependency Information
 
 ```clj
-:dependencies [[com.palletops/hyde "0.1.0-SNAPSHOT"]]
+:dependencies [[com.palletops/hyde "0.1.0"]]
 ```
 
 ## Motivation
