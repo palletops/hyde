@@ -8,6 +8,5 @@
                  [stencil "0.3.3"]
                  [me.raynes/fs "1.4.4"]
                  [pathetic "0.5.1"]
-                 [com.palletops/carapace "0.1.0-SNAPSHOT"]
                  [prismatic/schema "0.2.2"]
                  [com.palletops/api-builder "0.1.5"]])
