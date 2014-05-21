@@ -108,6 +108,8 @@
   (let [splices (splice-all s)]
     (glue splices (partial render-tag tag-reader-map))))
 
+(def ^:dynamic *tag-map* {})
+
 ;;; JEKYLL
 
 (def clean-target fs/delete-dir)
@@ -173,7 +175,7 @@
   {:sig [[s/Str Site-Config :- s/Bool]
          [s/Str Site-Config Tag-Map :- s/Bool]]}
   ([root site-config]
-     (copy-resources! root site-config {}))
+     (copy-resources! root site-config *tag-map*))
   ([root {:keys [template] :as site-config} tag-map]
      (let [template (if (keyword? template) (name template) template)
            resources (template-resources template)
@@ -198,9 +200,8 @@
   {:sig [[s/Str Doc :- s/Bool]
          [s/Str Doc Tag-Map :- s/Bool]]}
   ([root doc]
-     (write-document! root doc {}))
+     (write-document! root doc *tag-map*))
   ([root {:keys [path content front-matter] :as doc} tag-map]
-
      (let [content (if (empty? tag-map)
                      content
                      (render-content tag-map content))
@@ -219,7 +220,7 @@
   {:sig [[s/Str s/Str Collection :- s/Bool]
          [s/Str s/Str Collection Tag-Map :- s/Bool]]}
   ([root name coll]
-     (write-collection! root name coll {}))
+     (write-collection! root name coll *tag-map*))
   ([root
     name
     {:keys [index-key index? docs]
@@ -239,11 +240,11 @@
   {:sig [[s/Str s/Str s/Any :- s/Bool]
          [s/Str s/Str s/Any Tag-Map :- s/Bool]]}
   ([root name data]
-     (write-data! root name data {}))
+     (write-data! root name data *tag-map*))
   ([root name data tag-map]
      (let [target (format "%s/_data/%s.yaml" root name)
            content (yaml/generate-string data)
-           content (if (empty? tag-map) 
+           content (if (empty? tag-map)
                      content
                      (render-content tag-map content))]
        (spit target content)
