@@ -93,19 +93,20 @@
 
 
 (defmulti render class)
+
 (comment
   "Example of a tag"
   (defrecord Link [url])
   (defmethod render Link [l]
     (format "http://%s" (:url l))))
 
-(defn r [tag-reader-map s]
+(defn render-tag [tag-reader-map s]
   (let [form (clojure.edn/read-string {:readers tag-reader-map} s)]
     (when form (render form))))
 
 (defn render-content [tag-reader-map s]
   (let [splices (splice-all s)]
-    (glue splices (partial r tag-reader-map))))
+    (glue splices (partial render-tag tag-reader-map))))
 
 ;;; JEKYLL
 
