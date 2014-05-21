@@ -186,7 +186,7 @@
                _ (printf "copying %s to %s\n" source destination)
                source-content (try
                                 (slurp
-                                 (-> source resource file))
+                                 (-> source resource))
                                 (catch Exception e
                                   (throw (ex-info (format "Template %s not found" source)
                                                   {:type :config}))))
