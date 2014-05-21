@@ -9,4 +9,5 @@
                  [me.raynes/fs "1.4.4"]
                  [pathetic "0.5.1"]
                  [prismatic/schema "0.2.2"]
-                 [com.palletops/api-builder "0.1.5"]])
+                 [com.palletops/api-builder "0.1.5"]
+                 [scout "0.1.1"]])

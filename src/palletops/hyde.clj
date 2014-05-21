@@ -6,7 +6,9 @@
             [stencil.loader :as stencil-load]
             [clojure.java.io :refer [resource file as-file]]
             [com.palletops.api-builder.api :refer [defn-api]]
-            [schema.core :as s]))
+            [schema.core :as s]
+            [scout.core :as scout])
+  (import [clojure.lang Symbol]))
 
 ;;; SCHEMAS
 
@@ -37,7 +39,75 @@
     (s/optional-key :description) s/Str
     s/Keyword s/Any}})
 
+(def Tag-Map
+  ;; FIX: this should match symbols, but it's not happening with Symbol
+  {s/Any s/Any})
+
 ;;;; CODE
+
+;;;; TAGS
+
+(defn splice [start-match end-match]
+  (let [source (:src start-match)
+        end-pre (-> start-match :match :start)
+        start-tag (-> start-match :match :end)
+        end-tag (+ start-tag (-> end-match :match :start))
+        start-post (+ start-tag (-> end-match :match :end))
+        pre (subs source 0 end-pre)
+        tag (subs source start-tag end-tag)
+        post (subs source start-post)]
+    [pre tag post]))
+
+(defn next-tag [s]
+  (let [start (-> s
+                  (scout/scanner)
+                  (scout/scan-until #"\[\*"))
+        end (-> start
+                (scout/remainder)
+                (scout/scanner)
+                (scout/scan-until #"\*\]"))]
+    ;; full match? -> splice
+    (if (and (-> start :match)
+             (-> end :match))
+      (splice start end)
+      (if (-> start :match)
+        ;; unbalanced tags
+        (throw (Exception. "unmatched"))
+        ;; no tags left
+        [s nil nil]))))
+
+(defn splice-all
+  ([s] (splice-all s []))
+  ([s splices]
+     (if (> (count s) 0)
+       ;; only continue if there is some text left
+       (let [[pre tag post] (next-tag s)]
+         (splice-all post (concat splices [pre tag]) ))
+       splices)))
+
+(defn glue [splices tag-fn]
+  (apply str
+         (flatten
+          (map (fn [[text tag]] [text (tag-fn tag)])
+               (partition-all 2 splices)))))
+
+
+(defmulti render class)
+(comment
+  "Example of a tag"
+  (defrecord Link [url])
+  (defmethod render Link [l]
+    (format "http://%s" (:url l))))
+
+(defn r [tag-reader-map s]
+  (let [form (clojure.edn/read-string {:readers tag-reader-map} s)]
+    (when form (render form))))
+
+(defn render-content [tag-reader-map s]
+  (let [splices (splice-all s)]
+    (glue splices (partial r tag-reader-map))))
+
+;;; JEKYLL
 
 (def clean-target fs/delete-dir)
 
@@ -99,57 +169,83 @@
          var-get)))
 
 (defn-api copy-resources!
-  {:sig [[s/Str Site-Config :- s/Bool]]}
-  [root {:keys [template] :as site-config}]
-  (let [template (if (keyword? template) (name template) template)
-        resources (template-resources template)
-        files (map #(format "%s/%s" template %) resources)]
-    (doseq [r resources]
-      (let [source (format "%s/%s" template r)
-            destination (format "%s/%s" root r)
-            _ (printf "copying %s to %s\n" source destination)
-            source-content (try
-                             (slurp
-                              (-> source resource file))
-                             (catch Exception e
-                               (throw (ex-info (format "Template %s not found" source)
-                                               {:type :config}))))]
-        (spit destination source-content)))
-    true))
+  {:sig [[s/Str Site-Config :- s/Bool]
+         [s/Str Site-Config Tag-Map :- s/Bool]]}
+  ([root site-config]
+     (copy-resources! root site-config {}))
+  ([root {:keys [template] :as site-config} tag-map]
+     (let [template (if (keyword? template) (name template) template)
+           resources (template-resources template)
+           files (map #(format "%s/%s" template %) resources)]
+       (doseq [r resources]
+         (let [source (format "%s/%s" template r)
+               destination (format "%s/%s" root r)
+               _ (printf "copying %s to %s\n" source destination)
+               source-content (try
+                                (slurp
+                                 (-> source resource file))
+                                (catch Exception e
+                                  (throw (ex-info (format "Template %s not found" source)
+                                                  {:type :config}))))
+               source-content (if (empty? tag-map)
+                                source-content
+                                (render-content tag-map source-content))]
+           (spit destination source-content)))
+       true)))
 
 (defn-api write-document!
-  {:sig [[s/Str Doc :- s/Bool]]}
-  [root {:keys [path content front-matter] :as doc}]
-  (let [content (if front-matter
-                  (str "---\n"
-                       (yaml/generate-string front-matter)
-                       "---\n"
-                       content)
-                  content)
-        target (format "%s/%s" root path)]
-    (println (format "writing %s" target))
-    (spit target content)
-    true))
+  {:sig [[s/Str Doc :- s/Bool]
+         [s/Str Doc Tag-Map :- s/Bool]]}
+  ([root doc]
+     (write-document! root doc {}))
+  ([root {:keys [path content front-matter] :as doc} tag-map]
+
+     (let [content (if (empty? tag-map)
+                     content
+                     (render-content tag-map content))
+           content (if front-matter
+                     (str "---\n"
+                          (yaml/generate-string front-matter)
+                          "---\n"
+                          content)
+                     content)
+           target (format "%s/%s" root path)]
+       (println (format "writing %s" target))
+       (spit target content)
+       true)))
 
 (defn-api write-collection!
-  {:sig [[s/Str s/Str Collection :- s/Bool]]}
-  [root name {:keys [index-key index? docs]
-              :or {:index-key :index :index? true}
-              :as coll}]
-  (let [target-dir (format "%s/_%s" root name)
-        docs (if index?
-               (map #(assoc-in %1 [:front-matter index-key] %2) docs (range (count docs)))
-               docs)]
-    (doseq [doc docs]
-      (write-document! target-dir doc))
-    true))
+  {:sig [[s/Str s/Str Collection :- s/Bool]
+         [s/Str s/Str Collection Tag-Map :- s/Bool]]}
+  ([root name coll]
+     (write-collection! root name coll {}))
+  ([root
+    name
+    {:keys [index-key index? docs]
+     :or {:index-key :index :index? true}
+     :as coll}
+    tag-map]
+     (let [target-dir (format "%s/_%s" root name)
+           docs (if index?
+                  (map #(assoc-in %1 [:front-matter index-key] %2) docs (range (count docs)))
+                  docs)]
+       (doseq [doc docs]
+         (write-document! target-dir doc tag-map))
+       true)))
 
 (defn-api write-data!
   "Writes a data file"
-  {:sig [[s/Str s/Str s/Any :- s/Bool]]}
-  [root name data]
-  (let [target (format "%s/_data/%s.yaml" root name)
-        content (yaml/generate-string data)]
-    (spit target content)
-    true))
+  {:sig [[s/Str s/Str s/Any :- s/Bool]
+         [s/Str s/Str s/Any Tag-Map :- s/Bool]]}
+  ([root name data]
+     (write-data! root name data {}))
+  ([root name data tag-map]
+     (let [target (format "%s/_data/%s.yaml" root name)
+           content (yaml/generate-string data)
+           content (if (empty? tag-map) 
+                     content
+                     (render-content tag-map content))]
+       (spit target content)
+       true)))
+
 
