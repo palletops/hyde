@@ -1,5 +1,6 @@
 (ns palletops.hyde
   (:require [clj-yaml.core :as yaml]
+            [clojure.string :as string]
             [me.raynes.fs :as fs]
             [pathetic.core :as path]
             [stencil.core :as stencil]
@@ -101,12 +102,23 @@
     (format "http://%s" (:url l))))
 
 (defn render-tag [tag-reader-map s]
-  (let [form (clojure.edn/read-string {:readers tag-reader-map} s)]
-    (when form (render form))))
+  (let [form (try (clojure.edn/read-string {:readers tag-reader-map} s)
+                  (catch Exception e
+                    (println "Cannot parse tag:" s)
+                    nil))]
+    (if form
+      (render form)
+      (let [output (str "[*" s "*]")]
+        (printf "failed to parse %s, outputintg %s instead\n" s output)
+        output) )))
 
 (defn render-content [tag-reader-map s]
-  (let [splices (splice-all s)]
-    (glue splices (partial render-tag tag-reader-map))))
+  (let [splices (splice-all s)
+        out (glue splices (partial render-tag tag-reader-map))]
+    ;; allow self-documenting by replacing [[** and **]] with [* *]
+    (-> out
+        (string/replace #"\\\[\\\*" "[*")
+        (string/replace #"\\\*\\\]" "*]"))))
 
 (def ^:dynamic *tag-map* {})
 
