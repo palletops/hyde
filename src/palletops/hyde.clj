@@ -30,6 +30,7 @@
 
 (def Site-Config
   {:template s/Keyword
+   (s/optional-key :resources) [s/Str]
    :config
    {(s/optional-key :collections)
     {s/Keyword
@@ -189,9 +190,9 @@
          [s/Str Site-Config Tag-Map :- s/Bool]]}
   ([root site-config]
      (copy-resources! root site-config *tag-map*))
-  ([root {:keys [template] :as site-config} tag-map]
-     (let [template (if (keyword? template) (name template) template)
-           resources (template-resources template)
+  ([root {:keys [template resources] :as site-config} tag-map]
+     (printf "Copying resources: %s\n" resources)
+     (let [template (name template)
            files (map #(format "%s/%s" template %) resources)]
        (doseq [r resources]
          (let [source (format "%s/%s" template r)
@@ -225,7 +226,7 @@
                           content)
                      content)
            target (format "%s/%s" root path)]
-       (println (format "writing %s" target))
+       (println (format "writing %s (%s bytes)" target (count content)))
        (spit target content)
        true)))
 
@@ -242,7 +243,9 @@
     tag-map]
      (let [target-dir (format "%s/_%s" root name)
            docs (if index?
-                  (map #(assoc-in %1 [:front-matter index-key] %2) docs (range (count docs)))
+                  (map #(assoc-in %1 [:front-matter index-key] %2)
+                       docs
+                       (range (count docs)))
                   docs)]
        (doseq [doc docs]
          (write-document! target-dir doc tag-map))
