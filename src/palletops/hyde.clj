@@ -21,7 +21,7 @@
 (def Doc
   {(s/required-key :content) s/Str
    (s/required-key :path) s/Str
-   (s/optional-key :front-matter) {s/Keyword s/Any}})
+   (s/optional-key :front-matter) (s/maybe {s/Keyword s/Any})})
 
 (def Collection
   {:docs [Doc]
