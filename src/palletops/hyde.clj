@@ -102,15 +102,16 @@
     (format "http://%s" (:url l))))
 
 (defn render-tag [tag-reader-map s]
-  (let [form (try (clojure.edn/read-string {:readers tag-reader-map} s)
-                  (catch Exception e
-                    (println "Cannot parse tag:" s)
-                    nil))]
-    (if form
-      (render form)
-      (let [output (str "[*" s "*]")]
-        (printf "failed to parse %s, outputintg %s instead\n" s output)
-        output) )))
+  (when s
+    (let [form (try (clojure.edn/read-string {:readers tag-reader-map} s)
+                    (catch Exception e
+                      (println "Cannot parse tag:" s)
+                      nil))]
+      (if form
+        (render form)
+        (let [output (str "[*" s "*]")]
+          (printf "failed to parse %s, outputintg %s instead\n" s output)
+          output) ))))
 
 (defn render-content [tag-reader-map s]
   (let [splices (splice-all s)
