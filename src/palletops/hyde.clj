@@ -267,3 +267,4 @@
        true)))
 
 
+(def ^:dynamic *context* {})
